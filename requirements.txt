@@ -1,10 +1,2 @@
 Flask
-langchain-huggingface
-huggingface_hub
-transformers
-accelerate
-bitsandbytes
-langchain
-langchain-community
-pypdf
-qdrant-client
+
