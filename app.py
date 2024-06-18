@@ -4,7 +4,7 @@ from langchain_huggingface import HuggingFaceEndpoint
 from langchain_community.document_loaders import PyPDFDirectoryLoader
 from langchain.vectorstores import Qdrant
 from langchain.text_splitter import RecursiveCharacterTextSplitter
-from langchain.embeddings import HuggingFaceEmbeddings
+from langchain_huggingface import HuggingFaceEmbeddings
 from langchain.chains import RetrievalQA
 
 app = Flask(__name__)
@@ -70,5 +70,4 @@ def make_response(message):
     return {
         'fulfillmentText': message
     }
-
 
