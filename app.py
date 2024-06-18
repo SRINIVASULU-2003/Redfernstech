@@ -27,24 +27,16 @@ def chat():
 @app.route('/webhook', methods=['POST'])
 def webhook():
     req = request.get_json(silent=True, force=True)
-    res = process_request(req)
-    return jsonify(res)
+    user_message = req.get('queryResult', {}).get('queryText', '')
 
-def process_request(req):
-    # Extract the intent name from the request for logging or further use
-    intent = req.get('queryResult').get('intent').get('displayName')
+    # Pass the user's message directly to the model
+    hf_response = get_response_from_huggingface(user_message)
 
-    # Log the received intent
-    print(f"Received intent: {intent}")
-
-    # Call the Hugging Face API with the intent
-    hf_response = get_response_from_huggingface(intent)
-
-    # Create a response based on the Hugging Face API result
     return make_response(hf_response)
 
 def make_response(message):
     return {
         'fulfillmentText': message
     }
+
 
