@@ -39,7 +39,7 @@ qa = RetrievalQA.from_chain_type(llm=llm, chain_type="stuff", retriever=retrieve
 def get_response_from_huggingface(prompt):
     complete_prompt = (
         f"You are the Redfernstech chatbot. Please provide your answers using the "
-        f"information below in bullet points. Ensure the response is between 40 to 60 words.\n\n"
+        f"information below in bullet points. Ensure the response is between 40 to 60 words and give me friendly answers allways\n\n"
         f"Query: {prompt}\n\n"
         f"Response:"
     )
