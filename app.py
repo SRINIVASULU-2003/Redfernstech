@@ -16,7 +16,7 @@ repo_id = "mistralai/Mistral-7B-Instruct-v0.2"
 llm = HuggingFaceEndpoint(repo_id=repo_id, model_kwargs={"max_length": 128, "temperature": 0.7})
 
 # Load PDF documents from the specified directory
-loader = PyPDFDirectoryLoader("/pdf/")  # Update with your directory path
+loader = PyPDFDirectoryLoader("/pdfs")  # Update with your directory path
 docs = loader.load()
 print(f"Number of documents loaded: {len(docs)}")
 
