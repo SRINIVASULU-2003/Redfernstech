@@ -1,15 +1,28 @@
+from flask import Flask, request, render_template, jsonify
 import os
-import requests
-from flask import Flask, request, jsonify
+from langchain_huggingface import HuggingFaceEndpoint
 
 app = Flask(__name__)
 
-HUGGINGFACE_API_KEY = "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"
-HUGGINGFACE_API_URL = "https://api-inference.huggingface.co/models/mistralai/Mistral-7B-v0.3"
+# Set your HuggingFace API token
+os.environ["HUGGINGFACEHUB_API_TOKEN"] = "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"
 
-@app.route('/')
-def hello_world():
-    return 'Hello, World! RedFerns'
+repo_id = "mistralai/Mistral-7B-Instruct-v0.2"
+llm = HuggingFaceEndpoint(repo_id=repo_id, max_length=128, temperature=0.7)
+
+def get_response_from_huggingface(prompt):
+    response = llm.invoke(prompt)
+    return response
+
+@app.route("/")
+def home():
+    return render_template("index.html")
+
+@app.route("/chat", methods=["POST"])
+def chat():
+    user_message = request.json.get("message")
+    bot_response = get_response_from_huggingface(user_message)
+    return jsonify({"response": bot_response})
 
 @app.route('/webhook', methods=['POST'])
 def webhook():
@@ -25,30 +38,13 @@ def process_request(req):
     print(f"Received intent: {intent}")
 
     # Call the Hugging Face API with the intent
-    hf_response = call_huggingface_api(intent)
+    hf_response = get_response_from_huggingface(intent)
 
     # Create a response based on the Hugging Face API result
     return make_response(hf_response)
-
-def call_huggingface_api(prompt):
-    headers = {
-        "Authorization": f"Bearer {HUGGINGFACE_API_KEY}"
-    }
-    data = {
-        "inputs": prompt
-    }
-
-    response = requests.post(HUGGINGFACE_API_URL, headers=headers, json=data)
-    if response.status_code == 200:
-        result = response.json()
-        return result.get("generated_text", "No response generated.")
-    else:
-        print(f"Error {response.status_code}: {response.text}")
-        return "Error processing the request."
 
 def make_response(message):
     return {
         'fulfillmentText': message
     }
-
 
