@@ -16,7 +16,7 @@ repo_id = "mistralai/Mistral-7B-Instruct-v0.2"
 llm = HuggingFaceEndpoint(repo_id=repo_id, max_length=128, temperature=0.7)
 
 # Load PDF documents from the specified directory
-loader = PyPDFDirectoryLoader("\\pdfs")  # Update with your directory path
+loader = PyPDFDirectoryLoader("pdfs")  # Update with your directory path
 docs = loader.load()
 print(f"Number of documents loaded: {len(docs)}")
 
@@ -39,7 +39,7 @@ qa = RetrievalQA.from_chain_type(llm=llm, chain_type="stuff", retriever=retrieve
 def get_response_from_huggingface(prompt):
     complete_prompt = (
         f"You are the Redfernstech chatbot. Please provide your answers using the "
-        f"information below in bullet points. Ensure the response is between 40 to 60 words and give me friendly answers allways\n\n"
+        f"information below in bullet points. Ensure the response is between 40 to 60 words.\n\n"
         f"Query: {prompt}\n\n"
         f"Response:"
     )
@@ -70,4 +70,5 @@ def make_response(message):
     return {
         'fulfillmentText': message
     }
+
 
