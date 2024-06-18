@@ -13,15 +13,15 @@ app = Flask(__name__)
 os.environ["HUGGINGFACEHUB_API_TOKEN"] = "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"
 
 repo_id = "mistralai/Mistral-7B-Instruct-v0.2"
-llm = HuggingFaceEndpoint(repo_id=repo_id, model_kwargs={"max_length": 128, "temperature": 0.7})
+llm = HuggingFaceEndpoint(repo_id=repo_id, max_length=128, temperature=0.7)
 
 # Load PDF documents from the specified directory
-loader = PyPDFDirectoryLoader("/pdfs")  # Update with your directory path
+loader = PyPDFDirectoryLoader("pdfs")  # Update with your directory path
 docs = loader.load()
 print(f"Number of documents loaded: {len(docs)}")
 
 # Instantiate embeddings
-embeddings = HuggingFaceEmbeddings(model_name="sentence-transformers/all-mpnet-base-v2", model_kwargs={"device": "cuda"})
+embeddings = HuggingFaceEmbeddings(model_name="sentence-transformers/all-mpnet-base-v2")
 
 # Split documents into chunks
 text_splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=100)
@@ -37,7 +37,13 @@ retriever = qdrant_collection.as_retriever()
 qa = RetrievalQA.from_chain_type(llm=llm, chain_type="stuff", retriever=retriever)
 
 def get_response_from_huggingface(prompt):
-    response = qa.invoke(prompt)['result']
+    complete_prompt = (
+        f"You are the Redfernstech chatbot. Please provide your answers using the "
+        f"information below in bullet points. Ensure the response is between 40 to 60 words.\n\n"
+        f"Query: {prompt}\n\n"
+        f"Response:"
+    )
+    response = qa.invoke(complete_prompt)['result']
     return response
 
 @app.route("/")
@@ -64,4 +70,5 @@ def make_response(message):
     return {
         'fulfillmentText': message
     }
+
 
