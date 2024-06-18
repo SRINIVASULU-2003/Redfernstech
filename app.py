@@ -1,6 +1,11 @@
 from flask import Flask, request, render_template, jsonify
 import os
 from langchain_huggingface import HuggingFaceEndpoint
+from langchain_community.document_loaders import PyPDFDirectoryLoader
+from langchain.vectorstores import Qdrant
+from langchain.text_splitter import RecursiveCharacterTextSplitter
+from langchain.embeddings import HuggingFaceEmbeddings
+from langchain.chains import RetrievalQA
 
 app = Flask(__name__)
 
@@ -8,10 +13,31 @@ app = Flask(__name__)
 os.environ["HUGGINGFACEHUB_API_TOKEN"] = "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"
 
 repo_id = "mistralai/Mistral-7B-Instruct-v0.2"
-llm = HuggingFaceEndpoint(repo_id=repo_id, max_length=128, temperature=0.7)
+llm = HuggingFaceEndpoint(repo_id=repo_id, model_kwargs={"max_length": 128, "temperature": 0.7})
+
+# Load PDF documents from the specified directory
+loader = PyPDFDirectoryLoader("/pdf/")  # Update with your directory path
+docs = loader.load()
+print(f"Number of documents loaded: {len(docs)}")
+
+# Instantiate embeddings
+embeddings = HuggingFaceEmbeddings(model_name="sentence-transformers/all-mpnet-base-v2", model_kwargs={"device": "cuda"})
+
+# Split documents into chunks
+text_splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=100)
+all_splits = text_splitter.split_documents(docs)
+
+# Create Qdrant collection
+qdrant_collection = Qdrant.from_documents(all_splits, embeddings, location=":memory:", collection_name="all_documents")
+
+# Create retriever
+retriever = qdrant_collection.as_retriever()
+
+# Create RetrievalQA object
+qa = RetrievalQA.from_chain_type(llm=llm, chain_type="stuff", retriever=retriever)
 
 def get_response_from_huggingface(prompt):
-    response = llm.invoke(prompt)
+    response = qa.invoke(prompt)['result']
     return response
 
 @app.route("/")
@@ -38,5 +64,4 @@ def make_response(message):
     return {
         'fulfillmentText': message
     }
-
 
