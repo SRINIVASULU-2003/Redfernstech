@@ -1,3 +1,5 @@
 Flask
 gunicorn
+huggingface_hub
+langchain-huggingface
 requests
