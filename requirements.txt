@@ -1,3 +1,8 @@
 Flask
 gunicorn
+huggingface_hub
+langchain-huggingface
 requests
+qdrant-client
+pypdf
+langchain-community
