@@ -5,7 +5,7 @@ from flask import Flask, request, jsonify
 app = Flask(__name__)
 
 HUGGINGFACE_API_KEY = "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"
-HUGGINGFACE_API_URL = "https://api-inference.huggingface.co/models/Mistal7B"
+HUGGINGFACE_API_URL = "https://api-inference.huggingface.co/models/mistralai/Mistral-7B-v0.3"
 
 @app.route('/')
 def hello_world():
