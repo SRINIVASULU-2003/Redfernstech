@@ -2,4 +2,4 @@ pymupdf
 sentence-transformers
 llama-index
 huggingface-hub
-
+gunicorn
