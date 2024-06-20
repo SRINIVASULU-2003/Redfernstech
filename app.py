@@ -1,73 +1,101 @@
-from flask import Flask, request, render_template, jsonify
 import os
-from langchain_huggingface import HuggingFaceEndpoint
-from langchain_community.document_loaders import PyPDFDirectoryLoader
-from langchain.vectorstores import Qdrant
-from langchain.text_splitter import RecursiveCharacterTextSplitter
-from langchain_huggingface import HuggingFaceEmbeddings
-from langchain.chains import RetrievalQA
+from flask import Flask, request, jsonify
+from llama_index.core import StorageContext, load_index_from_storage, VectorStoreIndex, SimpleDirectoryReader, ChatPromptTemplate, Settings
+from llama_index.llms.huggingface import HuggingFaceInferenceAPI
+from llama_index.embeddings.huggingface import HuggingFaceEmbedding
+from sentence_transformers import SentenceTransformer
+import fitz  # PyMuPDF
 
 app = Flask(__name__)
 
-# Set your HuggingFace API token
-os.environ["HUGGINGFACEHUB_API_TOKEN"] = "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"
+# Configure the Llama index settings
+Settings.llm = HuggingFaceInferenceAPI(
+    model_name="google/gemma-1.1-7b-it",
+    tokenizer_name="google/gemma-1.1-7b-it",
+    context_window=3000,
+    token="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",
+    max_new_tokens=512,
+    generate_kwargs={"temperature": 0.1},
+    model_config={'protected_namespaces': ()}  # To resolve the UserWarning
+)
+Settings.embed_model = HuggingFaceEmbedding(
+    model_name="BAAI/bge-small-en-v1.5"
+)
 
-repo_id = "mistralai/Mistral-7B-Instruct-v0.2"
-llm = HuggingFaceEndpoint(repo_id=repo_id, max_length=128, temperature=0.7)
+# Define the directory for persistent storage and data
+PERSIST_DIR = "db"
+UPLOAD_FOLDER = 'uploads'
 
-# Load PDF documents from the specified directory
-loader = PyPDFDirectoryLoader("pdfs")  # Update with your directory path
-docs = loader.load()
-print(f"Number of documents loaded: {len(docs)}")
+# Ensure upload directory exists
+os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+os.makedirs(PERSIST_DIR, exist_ok=True)
 
-# Instantiate embeddings
-embeddings = HuggingFaceEmbeddings(model_name="sentence-transformers/all-mpnet-base-v2")
+def extract_text_from_pdf(file_path):
+    text = ""
+    doc = fitz.open(file_path)
+    for page in doc:
+        text += page.get_text()
+    return text
 
-# Split documents into chunks
-text_splitter = RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=100)
-all_splits = text_splitter.split_documents(docs)
+def data_ingestion(file_path):
+    text = extract_text_from_pdf(file_path)
+    documents = [text]
+    storage_context = StorageContext.from_defaults()
+    index = VectorStoreIndex.from_documents(documents)
+    index.storage_context.persist(persist_dir=PERSIST_DIR)
 
-# Create Qdrant collection
-qdrant_collection = Qdrant.from_documents(all_splits, embeddings, location=":memory:", collection_name="all_documents")
+def handle_query(query):
+    chat_text_qa_msgs = [
+        (
+            "user",
+            """You are a Q&A assistant named CHATTO, created by Suriya. You have a specific response programmed for when users specifically ask about your creator, Suriya. The response is: "I was created by Suriya, an enthusiast in Artificial Intelligence. He is dedicated to solving complex problems and delivering innovative solutions. With a strong focus on machine learning, deep learning, Python, generative AI, NLP, and computer vision, Suriya is passionate about pushing the boundaries of AI to explore new possibilities." For all other inquiries, your main goal is to provide answers as accurately as possible, based on the instructions and context you have been given. If a question does not match the provided context or is outside the scope of the document, kindly advise the user to ask questions within the context of the document.
+            Context:
+            {context_str}
+            Question:
+            {query_str}
+            """
+        )
+    ]
+    text_qa_template = ChatPromptTemplate.from_messages(chat_text_qa_msgs)
 
-# Create retriever
-retriever = qdrant_collection.as_retriever()
+    # Load index from storage
+    storage_context = StorageContext.from_defaults(persist_dir=PERSIST_DIR)
+    index = load_index_from_storage(storage_context)
 
-# Create RetrievalQA object
-qa = RetrievalQA.from_chain_type(llm=llm, chain_type="stuff", retriever=retriever)
+    query_engine = index.as_query_engine(text_qa_template=text_qa_template)
+    answer = query_engine.query(query)
 
-def get_response_from_huggingface(prompt):
-    complete_prompt = (
-        f"You are the Redfernstech chatbot. Please provide your answers using the "
-        f"information below in bullet points. Ensure the response is between 40 to 60 words.\n\n"
-        f"Query: {prompt}\n\n"
-        f"Response:"
-    )
-    response = qa.invoke(complete_prompt)['result']
-    return response
+    if hasattr(answer, 'response'):
+        return answer.response
+    elif isinstance(answer, dict) and 'response' in answer:
+        return answer['response']
+    else:
+        return "Sorry, I couldn't find an answer."
 
-@app.route("/")
-def home():
-    return render_template("index.html")
+@app.route('/upload', methods=['POST'])
+def upload():
+    if 'file' not in request.files:
+        return jsonify({"error": "No file part"}), 400
+    
+    files = request.files.getlist('file')
+    file_paths = []
+    for file in files:
+        file_path = os.path.join(UPLOAD_FOLDER, file.filename)
+        file.save(file_path)
+        file_paths.append(file_path)
+        data_ingestion(file_path)
+    
+    return jsonify({"message": "Files successfully uploaded and ingested"}), 200
 
-@app.route("/chat", methods=["POST"])
-def chat():
-    user_message = request.json.get("message")
-    bot_response = get_response_from_huggingface(user_message)
-    return jsonify({"response": bot_response})
+@app.route('/query', methods=['POST'])
+def query():
+    data = request.get_json()
+    if not data or 'query' not in data:
+        return jsonify({"error": "No query provided"}), 400
+    
+    query = data['query']
+    answer = handle_query(query)
+    return jsonify({"answer": answer}), 200
 
-@app.route('/webhook', methods=['POST'])
-def webhook():
-    req = request.get_json(silent=True, force=True)
-    user_message = req.get('queryResult', {}).get('queryText', '')
-
-    # Pass the user's message directly to the model
-    hf_response = get_response_from_huggingface(user_message)
-
-    return make_response(hf_response)
-
-def make_response(message):
-    return {
-        'fulfillmentText': message
-    }
-
+if __name__ == '__main__':
+    app.run(host='0.0.0.0', port=5000)
