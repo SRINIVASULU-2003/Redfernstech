@@ -1,8 +1,5 @@
-Flask
-gunicorn
-huggingface_hub
-langchain-huggingface
-requests
-qdrant-client
-pypdf
-langchain-community
+pymupdf
+sentence-transformers
+llama-index
+huggingface-hub
+gradio
